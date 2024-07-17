@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three Screen Chat App</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .header, .footer {
+      padding: 10px;
+      background-color: #f1f1f1;
+      text-align: center;
+    }
+    .header {
+      border-bottom: 2px solid red;
+      background-color: white;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container {
+      display: flex;
+      flex: 1;
+    }
+    .frame {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    .frame.low-charging {
+      border-color: red;
+    }
+    .frame:last-child {
+      border-right: none;
+    }
+    .chat-window {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 160px); /* Adjusted for header and footer */
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    .input-field {
+      display: flex;
+    }
+    .input-field input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    .input-field button {
+      padding: 10px;
+      border: 1px solid #ddd;
+      background-color: #4CAF50;
+      color: white;
+    }
+    .message {
+      display: flex;
+      justify-content: space-between;
+    }
+    .message.user {
+      justify-content: flex-end;
+      text-align: right;
+    }
+    .bookmark {
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+    }
+    .bookmark:hover {
+      background-color: #f1f1f1;
+    }
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      background-color: white;
+      border: 1px solid #ddd;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      display: none;
+      z-index: 1000;
+    }
+    .popup .close-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      cursor: pointer;
+      background: red;
+      color: white;
+      padding: 5px 10px;
+    }
+    .share-btn {
+      background-color: #008CBA;
+      color: white;
+      padding: 5px;
+      border: none;
+      cursor: pointer;
+    }
+    .title {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    ChatGPT <span style="color: red;">•</span>
+  </div>
+
+  <div class="container">
+    <div class="frame" id="frame1">
+      <h2>Chat Log</h2>
+      <div id="chat-log"></div>
+    </div>
+    <div class="frame" id="frame2">
+      <div class="chat-window">
+        <div id="messages" class="messages"></div>
+        <div class="input-field">
+          <input type="text" id="user-input" placeholder="Type your message...">
+          <button onclick="sendMessage()">Send</button>
+        </div>
+        <div class="footer">
+          <button onclick="showPopup()">Your Responses</button>
+          <div>
+            Add Title: <input type="text" id="new-title">
+            Add Response: <input type="text" id="new-response">
+            <button onclick="addCustomResponse()">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" id="frame3">
+      <h2>Bookmarks</h2>
+      <div id="bookmarks"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Live Charging Status: <span id="charging-status">80%</span></span>
+    <span id="live-percentage">80%</span>
+  </div>
+
+  <div id="popup" class="popup">
+    <div class="close-btn" onclick="closePopup()">X</div>
+    <h3>Your Responses</h3>
+    <div id="user-responses"></div>
+  </div>
+
+  <script>
+    let chargingStatus = 80;
+    const chatLog = document.getElementById('chat-log');
+    const messages = document.getElementById('messages');
+    const bookmarks = document.getElementById('bookmarks');
+    const userResponses = document.getElementById('user-responses');
+    const frame1 = document.getElementById('frame1');
+    const frame2 = document.getElementById('frame2');
+    const frame3 = document.getElementById('frame3');
+    const customResponseArea = document.getElementById('custom-response-area');
+
+    const responses = {
+      "hi": "Hi, Sai Charan. How are you?",
+      "fine": "That's great!"
+    };
+
+    function updateChargingStatus() {
+      const chargingElement = document.getElementById('charging-status');
+      const livePercentageElement = document.getElementById('live-percentage');
+      const header = document.querySelector('.header');
+      chargingElement.textContent = `${chargingStatus}%`;
+      livePercentageElement.textContent = `${chargingStatus}%`;
+
+      if (chargingStatus < 70) {
+        document.body.style.background = 'linear-gradient(to bottom, red, yellow)';
+        frame1.classList.add('low-charging');
+        frame2.classList.add('low-charging');
+        frame3.classList.add('low-charging');
+        header.style.backgroundColor = 'white';
+      } else {
+        document.body.style.background = 'white';
+        frame1.classList.remove('low-charging');
+        frame2.classList.remove('low-charging');
+        frame3.classList.remove('low-charging');
+        header.style.backgroundColor = 'green';
+      }
+    }
+
+    setInterval(() => {
+      // Simulate charging status change
+      chargingStatus = Math.max(0, chargingStatus - 1);
+      updateChargingStatus();
+    }, 10000); // Update every 10 seconds
+
+    function sendMessage() {
+      const userInput = document.getElementById('user-input');
+      const messageText = userInput.value.trim();
+      if (messageText === '') return;
+
+      addMessage('user', messageText);
+      addChatLog(messageText);
+      addUserResponse(messageText);
+
+      if (responses[messageText.toLowerCase()]) {
+        const response = responses[messageText.toLowerCase()];
+        addMessage('bot', response);
+        addChatLog(response, true);
+      }
+
+      handleCommands(messageText);
+
+      userInput.value = '';
+    }
+
+    function addMessage(sender, text) {
+      const message = document.createElement('div');
+      message.className = `message ${sender}`;
+      message.textContent = text;
+      message.ondblclick = () => saveBookmark(text);
+      messages.appendChild(message);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function addChatLog(text) {
+      const logEntry = document.createElement('div');
+      logEntry.className = 'title';
+      logEntry.textContent = text;
+      logEntry.onclick = () => showRelatedResponse(text);
+      logEntry.ondblclick = () => handleTitleDoubleClick(text);
+      chatLog.appendChild(logEntry);
+    }
+
+    function showRelatedResponse(title) {
+      messages.innerHTML = '';
+      addMessage('user', title);
+      if (responses[title.toLowerCase()]) {
+        addMessage('bot', responses[title.toLowerCase()]);
+      }
+      messages.style.backgroundColor = 'skyblue';
+    }
+
+    function renameTitle(logEntry) {
+      const newTitle = prompt('Rename title:', logEntry.textContent);
+      if (newTitle !== null && newTitle.trim() !== '') {
+        logEntry.textContent = newTitle;
+        logEntry.onclick = () => showRelatedResponse(newTitle);
+      }
+    }
+
+    function saveBookmark(text) {
+      const bookmark = document.createElement('div');
+      bookmark.className = 'bookmark';
+      bookmark.innerHTML = `${text} <button class="share-btn" onclick="share('${text}')">Share</button>`;
+      bookmark.onclick = () => editBookmark(bookmark);
+      bookmarks.appendChild(bookmark);
+    }
+
+    function editBookmark(bookmark) {
+      const newText = prompt('Edit bookmark:', bookmark.textContent);
+      if (newText !== null && newText.trim() !== '') {
+        bookmark.innerHTML = `${newText} <button class="share-btn" onclick="share('${newText}')">Share</button>`;
+      }
+    }
+
+    function addUserResponse(text) {
+      const response = document.createElement('div');
+      response.textContent = text;
+      userResponses.appendChild(response);
+    }
+
+    function showPopup() {
+      document.getElementById('popup').style.display = 'block';
+    }
+
+    function closePopup() {
+      document.getElementById('popup').style.display = 'none';
+    }
+
+
+    function addCustomResponse() {
+      const newTitle = document.getElementById('new-title').value.trim();
+      const newResponse = document.getElementById('new-response').value.trim();
+      if (newTitle !== '' && newResponse !== '') {
+        responses[newTitle.toLowerCase()] = newResponse;
+        customResponseArea.style.display = 'block';
+        userResponses.innerHTML = `<div>${newTitle}</div><div>${newResponse}</div>`;
+        document.getElementById('new-title').value = '';
+        document.getElementById('new-response').value = '';
+      }
+    }
+
+    function handleCommands(messageText) {
+      const commandPattern = /change frame (\d+) color to (\w+)/i;
+      const match = messageText.match(commandPattern);
+
+      if (match) {
+        const frameNumber = match[1];
+        const color = match[2];
+        changeFrameColor(frameNumber, color);
+      }
+    }
+
+    function changeFrameColor(frameNumber, color) {
+      const frame = document.getElementById(`frame${frameNumber}`);
+      if (frame) {
+        frame.style.backgroundColor = color;
+      }
+    }
+
+    function saveTitle(title) {
+      addChatLog(title);
+      addMessage('user', title);
+    }
+
+    function saveTitleAndShare(title) {
+      saveTitle(title);
+      share(title);
+    }
+
+    function saveTitleAndResponse(title, response) {
+      saveTitle(title);
+      addMessage('bot', response);
+    }
+
+    function handleTitleDoubleClick(title) {
+      saveTitle(title);
+    }
+
+    function handleTitleDoubleClickAndShare(title, response) {
+      saveTitleAndResponse(title, response);
+      share(title + ': ' + response);
+    }
+
+    function handleTitleClick(title, response) {
+      addMessage('user', title);
+      addMessage('bot', response);
+    }
+function share(title, response) {
+  const text = `${title}: ${response}`;
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+function saveTitleAndResponse(title, response) {
+  saveTitle(title);
+  addMessage('bot', response);
+  share(title, response);
+}
+
+  </script>
+</body>
+</html>
